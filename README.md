@@ -1,6 +1,4 @@
-# Predicting Houly Wage of the National Longitudinal Survey of Youth 1997 Dataset
-
-Author: John Carlo Maula
+# Predicting Houly Wage Using the National Longitudinal Survey of Youth 1997 Dataset
 
 ## Introduction
 
@@ -29,21 +27,21 @@ For more details about the variables, you can view the official documentation [h
 
 ## Project Overview
 
-### Part 1: [Data Cleaning and Preparation](https://github.com/johncarlomaula/nlsy-earnings-project/blob/main/nlsy_clean.md)
+### Part 1: [Data Cleaning and Preparation](https://github.com/daniardor/nlsy-project/blob/main/nlsy_clean.md)
 
 This section of the project focuses on preparing the dataset for exploratory data analysis.
 
-### Part 2: [Exploratory Data Analysis](https://github.com/johncarlomaula/nlsy-earnings-project/blob/main/nlsy_eda.md)
+### Part 2: [Exploratory Data Analysis](https://github.com/daniardor/nlsy-project/blob/main/nlsy_eda.md)
 
 This section focuses on exploring and visualizing the NLSY97 dataset.
 
 
-### Part 3: [Data Modeling](https://github.com/johncarlomaula/nlsy-earnings-project/blob/main/nlsy_model.md)
+### Part 3: [Data Modeling](https://github.com/daniardor/nlsy-project/blob/main/nlsy_model.md)
 
 This section focuses on building and testing models to predict the hourly wage of the NLSY97 respondents based on their features.
 
 
-### Part 4: [Feature Engineering with Clustering](https://github.com/johncarlomaula/nlsy-earnings-project/blob/main/nlsy_cluster.md)
+### Part 4: [Feature Engineering with Clustering](https://github.com/daniardor/nlsy-project/blob/main/nlsy_cluster.md)
 
 This section focuses on feature engineering using a clustering method to see if it can improve the performance of the previous models.
 
