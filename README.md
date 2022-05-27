@@ -22,7 +22,7 @@ This project comes from an online course, *100 Days of Python Coding*. However, 
 
 ### Description of the Dataset
 
-The provided dataset is a subset of 2,000 observations. A list of variable names and descriptions can be found in [NLSY97_Variable_Names_and_Descriptions.csv](https://github.com/johncarlomaula/nlsy-earnings-project/blob/main/data/NLSY97_Variable_Names_and_Descriptions.csv). 
+The provided dataset is a subset of 2,000 observations. A list of variable names and descriptions can be found in [NLSY97_Variable_Names_and_Descriptions.csv](https://github.com/daniardor/nlsy-project/blob/main/data/NLSY97_Variable_Names_and_Descriptions.csv). 
 
 For more details about the variables, you can view the official documentation [here](https://www.nlsinfo.org/content/cohorts/nlsy97/topical-guide).
 
