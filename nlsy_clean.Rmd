@@ -1,0 +1,447 @@
+---
+title: "Dataset Preparation"
+output: 
+  rmarkdown::github_document:
+    toc: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction
+
+This section of the project will focus on preparing the dataset for exploratory data analysis (EDA) and data modeling.
+
+### 1.1 Loading Packages
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Load required libraries
+library(DataExplorer)
+library(tidyverse)
+```
+
+### 1.2 Importing the Data
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Import data
+df <- read.csv("data/NLSY97_subset.csv")
+```
+
+## 2. Data Cleaning
+
+### 2.1 Viewing the Data
+
+I first looked at the structure of the dataset.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Preview the data
+head(df, 3)
+
+# View structure of the data
+str(df)
+```
+
+The dataset contains 2000 rows and 96 variables. Although none of the variable types are factors, there are many binary variables in the dataset.
+
+### 2.2 Duplicate Values
+
+Next, I checked for duplicated values in the dataset and found that there are 513 duplicate observations. I removed these rows from the dataset.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Check for duplicated IDs
+dim(df[duplicated(df),])[1]
+
+# Remove duplicated rows
+df <- df[!duplicated(df), ]
+```
+
+### 2.3 Missing Values
+
+I used the *plot_missing* function from the *DataExplorer* package to visualize the missing values in the dataset.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Plot the missing values
+plot_missing(df, missing_only = TRUE)
+```
+
+This plot shows the proportion of values missing for the variables that have them. It also labels them as "good", "ok", and "bad" depending on the number of missing values. Most of the variables in the plot are **parental style in 1997**, **parental monitoring in 1997** and **family background**. Other variables include birth year, number of jobs, household income, and poverty rate in 1997.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Count rows with no missing values
+dim(df[complete.cases(df), ])
+```
+
+There are only 492 observations without any missing values. For now, I have decided to keep the variables with missing values. Once I finish taking a closer look at these variables during the EDA section, I will determine whether to drop them or use some kind imputation method.
+
+## 3. Collapsing Dummy Variables
+
+Many of the variables in the dataset are **dummy variables**. For example, FEMALE and MALE are dummy variables for sex. If one of the variables is coded as 1, the other one will be 0. Based the names of the dummy variables (or the variable itself), I have classified them into 14 groups:
+
+1. **Sex**: FEMALE, MALE
+2. **Ethnicity**: ETHBLACK, ETHHISP, ETHWHITE
+3. **Education**: EDUCPROF, EDUCPHD, EDUCMAST, EDUCBA, EDUCAA, EDUCHSD, EDUCGED, EDUCDO
+4. **Marital Status**: SINGLE, MARRIED, COHABIT, OTHSING
+5. **Faith**: FAITHN, FAITHC, FAITHJ, FAITHP, FAITHO, FAITHM
+6. **Metropolitan Statistical Area in 1997**: MSA97NO, MSA97NCC, MSA97CC, MSA97NK
+7. **Rural/Urban Area in 1997**: RS97RURL, RS97URBN, RS97UNKN
+8. **Census Region in 1997**: REG97NE, REG97NC, REG97W, REG97S
+9. **Household Structure in 1997**: HHBMBF, HHBMOF, HHOMBF, HHBMONLY, HHBFONLY, HHOTHER
+10. **Mother Parental Style in 1997**: PRMSTYUN, PRMSTYPE, PRMSTYAU, PRMSTYAU
+11. **Paternal Parental Style in 1997**: PRFSTYUN, PRFSTYPE, PRFSTYAU, PRFSTYAE
+12. **Category of Employment**: CATGOV, CATPRI, CATSE, CATNPO, CATMIS
+13. **Metropolitan Statistical Area in 2011**: MSA11NO, MSA11NCC, MSA11CC, MSA11NK, 
+14. **Census Region in 2011**: REGNE, REGNC, REGW, REGS
+
+For each group, I will collapse the dummy variables and create a single variable to simplify the dataset. First, I will need to verify that the dummy variables are mutually exclusive. To do this, I will calculate the row sums of these variables and see if each sum is equal to 1. If the summary statistics of the row sums are all equal to 1, then the variables are mutually exclusive.
+
+Once I verify that the dummy variables are mutually exclusive, I will collapse them to create a single variable and verify that I recoded the data correctly.
+
+##### 1. Sex
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(FEMALE, MALE))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$SEX <- as.factor(ifelse(df$FEMALE == 1, "Female", "Male"))
+
+# Verify new variable
+sample_n(subset(df, select = c(SEX, FEMALE, MALE)), 5)
+```
+
+
+##### 2. Ethnicity
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(ETHBLACK, ETHHISP, ETHWHITE))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$ETHNICITY <- as.factor(ifelse(df$ETHBLACK == 1, "Black",
+                        ifelse(df$ETHHISP == 1, "Hispanic", "Non-black, non-hispanic")))
+
+# Verify new variable
+sample_n(subset(df, select = c(ETHNICITY, ETHBLACK, ETHHISP, ETHWHITE)), 5)
+```
+
+
+##### 3. Education
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(EDUCPROF, EDUCPHD, EDUCMAST, EDUCBA, EDUCAA, EDUCHSD, EDUCGED, EDUCDO))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$EDUCATION <- as.factor(ifelse(df$EDUCPROF == 1, "Professional degree",
+                          ifelse(df$EDUCPHD == 1, "Doctorate",
+                          ifelse(df$EDUCMAST == 1, "Master's degree",
+                          ifelse(df$EDUCBA == 1, "Bachelor's degree",
+                          ifelse(df$EDUCAA == 1, "Associate's degree",
+                          ifelse(df$EDUCHSD == 1, "High school diploma",
+                          ifelse(df$EDUCGED == 1, "GED", "High school drop-out"))))))))
+
+# Verify new variable
+sample_n(subset(df, select = c(EDUCATION, EDUCPROF, EDUCPHD, EDUCMAST, EDUCBA, EDUCAA, EDUCHSD, EDUCGED, EDUCDO)), 5)
+```
+
+
+##### 4. Marital Status
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(SINGLE, MARRIED, COHABIT, OTHSING))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$MARITALSTAT <- as.factor(ifelse(df$SINGLE == 1, "Single, never married",
+                            ifelse(df$MARRIED == 1, "Married, spouse present",
+                            ifelse(df$COHABIT == 1, "Cohabiting", "Other single"))))
+
+# Verify new variable
+sample_n(subset(df, select = c(MARITALSTAT, SINGLE, MARRIED, COHABIT, OTHSING)), 5)
+```
+
+
+##### 5. Faith
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(FAITHN, FAITHC, FAITHJ, FAITHP, FAITHO, FAITHM))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$FAITH <- as.factor(ifelse(df$FAITHN == 1, "None",
+                      ifelse(df$FAITHC == 1, "Catholic",
+                      ifelse(df$FAITHJ == 1, "Jewish",
+                      ifelse(df$FAITHP == 1, "Protestant",
+                      ifelse(df$FAITHO == 1, "Other", "Missing value"))))))
+
+# Verify new variable
+sample_n(subset(df, select = c(FAITH, FAITHN, FAITHC, FAITHJ, FAITHP, FAITHO, FAITHM)), 5)
+```
+
+##### 6. Metropolitan Statistical Area in 1997
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(MSA97NO, MSA97NCC, MSA97CC, MSA97NK))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$METSTAT97 <- as.factor(ifelse(df$MSA97NO == 1, "Not in MSA",
+                      ifelse(df$MSA97NCC == 1, "MSA, not central city",
+                      ifelse(df$MSA97CC == 1, "MSA, central city", "MSA, not known"))))
+
+# Verify new variable
+sample_n(subset(df, select = c(METSTAT97, MSA97NO, MSA97NCC, MSA97CC, MSA97NK)), 5)
+
+```
+
+
+##### 7. Rural/Urban Area in 1997
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(RS97RURL, RS97URBN, RS97UNKN))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$AREA97 <- as.factor(ifelse(df$RS97RURL == 1, "Rural",
+                      ifelse(df$RS97URBN == 1, "Urban", "Unknown")))
+
+# Verify new variable
+sample_n(subset(df, select = c(AREA97, RS97RURL, RS97URBN, RS97UNKN)), 5)
+```
+
+
+##### 8. Census Region in 1997
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(REG97NE, REG97NC, REG97W, REG97S))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$CENREG97 <- as.factor(ifelse(df$REG97NE == 1, "North east",
+                      ifelse(df$REG97NC == 1, "North central",
+                      ifelse(df$REG97W == 1, "West", "South"))))
+
+# Verify new variable
+sample_n(subset(df, select = c(CENREG97, REG97NE, REG97NC, REG97W, REG97S)), 5)
+```
+
+
+##### 9. Household Structure in 1997
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(HHBMBF, HHBMOF, HHOMBF, HHBMONLY, HHBFONLY, HHOTHER))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$HOUSE97 <- as.factor(ifelse(df$HHBMBF == 1, "Biological mother and father",
+                        ifelse(df$HHBMOF == 1, "Biological mother, other father",
+                        ifelse(df$HHOMBF == 1, "Other mother, biological father",
+                        ifelse(df$HHBMONLY == 1, "Biological mother only",
+                        ifelse(df$HHBFONLY == 1, "Biological father only", "Other"))))))
+
+# Verify new variable
+sample_n(subset(df, select = c(HOUSE97, HHBMBF, HHBMOF, HHOMBF, HHBMONLY, HHBFONLY, HHOTHER)), 5)
+```
+
+
+##### 10. Maternal Parental Style in 1997
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(PRMSTYUN, PRMSTYPE, PRMSTYAN, PRMSTYAE))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$MATSTYLE <- as.factor(ifelse(df$PRMSTYUN == 1, "Uninvolved",
+                         ifelse(df$PRMSTYPE == 1, "Permissive",
+                         ifelse(df$PRMSTYAN == 1, "Authoritarian", "Authoritative"))))
+
+# Verify new variable
+sample_n(subset(df, select = c(MATSTYLE, PRMSTYUN, PRMSTYPE, PRMSTYAN, PRMSTYAE)), 5)
+```
+
+
+##### 11. Paternal Parental Style in 1997
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(PRFSTYUN, PRFSTYPE, PRFSTYAN, PRFSTYAE))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$PATSTYLE <- as.factor(ifelse(df$PRFSTYUN == 1, "Uninvolved",
+                         ifelse(df$PRFSTYPE == 1, "Permissive",
+                         ifelse(df$PRFSTYAN == 1, "Authoritarian", "Authoritative"))))
+
+# Verify new variable
+sample_n(subset(df, select = c(PATSTYLE, PRFSTYUN, PRFSTYPE, PRFSTYAN, PRFSTYAE)), 5)
+```
+
+##### 12. Category of Employment
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(CATGOV, CATPRI, CATSE, CATNPO, CATMIS))))
+```
+
+The maximum row sum is equal 2, indicating that these variables are not mutually exclusive. I decided to take a closer look at these rows.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+summary(subset(df[df$CATGOV + df$CATPRI + df$CATSE + df$CATNPO + df$CATMIS == 2, ], select = c(CATGOV, CATPRI, CATSE, CATNPO, CATMIS)))
+```
+
+For the rows with a sum of 2, all the values for **CATSE** (self-employment) are equal to 1, indicating that it is a separate variable. I calculated the row sum summary again without **CATSE**.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Subset group of variables and obtain summary of row sums
+summary(rowSums(subset(df, select = c(CATGOV, CATPRI, CATNPO, CATMIS))))
+```
+
+These set of variables are mutually exclusive, so I recoded them into the Category of Employment variable. As for **CATSE**, it will remain a separate variable for self-employment.
+
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$CATEMP <- as.factor(ifelse(df$CATGOV == 1, "Government",
+                      ifelse(df$CATPRI == 1, "Private sector",
+                      ifelse(df$CATNPO == 1, "Non-profit", "Missing value"))))
+
+# Verify new variable
+sample_n(subset(df, select = c(CATEMP, CATGOV, CATPRI, CATNPO, CATMIS)), 5)
+```
+
+
+##### 13. Metropolitan Statistical Area in 2011
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(MSA11NO, MSA11NCC, MSA11CC, MSA11NK, MSA11NIC))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$METSTAT11 <- as.factor(ifelse(df$MSA11NO == 1, "Not in MSA",
+                      ifelse(df$MSA11NCC == 1, "MSA, not central city",
+                      ifelse(df$MSA11CC == 1, "MSA, central city", 
+                      ifelse(df$MSA11NIC == 1, "Not in country", "MSA, not known")))))
+
+# Verify new variable
+sample_n(subset(df, select = c(METSTAT11, MSA11NO, MSA11NCC, MSA11CC, MSA11NK, MSA11NIC)), 5)
+```
+
+
+##### 14. Census Region in 2011
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain statistical summary of the row sums of the dummy variables
+summary(rowSums(subset(df, select = c(REGNE, REGNC, REGW, REGS))))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Recode the dummy variables into a single variable
+df$CENREG11 <- as.factor(ifelse(df$REGNE == 1, "North east",
+                      ifelse(df$REGNC == 1, "North central",
+                      ifelse(df$REGW == 1, "West", "South"))))
+
+# Verify new variable
+sample_n(subset(df, select = c(CENREG11, REGNE, REGNC, REGW, REGS)), 5)
+```
+
+## 4. Finalizing the Dataset
+
+### 4.1 Removing Variables
+
+Now that I have collapsed the dummy variables, I dropped their respective columns from the dataset. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Drop the dummy variables from the dataset
+df <- subset(df, select = -c(FEMALE, MALE, ETHBLACK, ETHHISP, ETHWHITE, EDUCPROF,
+                             EDUCPHD, EDUCMAST, EDUCBA, EDUCAA, EDUCHSD, EDUCGED, EDUCDO,
+                             SINGLE, MARRIED, COHABIT, OTHSING, FAITHN, FAITHC, FAITHJ, 
+                             FAITHP,FAITHO, FAITHM, MSA97NO, MSA97NCC, MSA97CC, MSA97NK,
+                             RS97RURL, RS97URBN, RS97UNKN, REG97NE, REG97NC, REG97W,
+                             REG97S, HHBMBF, HHBMOF, HHOMBF, HHBMONLY, HHBFONLY, HHOTHER,
+                             PRMSTYUN, PRMSTYPE, PRMSTYAN, PRMSTYAE, PRFSTYUN, PRFSTYPE,
+                             PRFSTYAN, PRFSTYAE, CATGOV, CATPRI, CATNPO, CATMIS, MSA11NO,
+                             MSA11NCC, MSA11CC, MSA11NK, MSA11NIC, REGNE, REGNC, 
+                             REGW,REGS))
+```
+
+
+### 4.2 Verifying the Dataset
+
+I viewed the structure of the data again to see what else is required to do.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+str(df)
+```
+
+### 4.3 Refactoring Variables
+
+There are factor 3 variables left that are still coded as integers. I decided to refactor those variables.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Refactor self-employment variable
+df$CATSE <- as.factor(ifelse(df$CATSE == 1, "Yes", "No"))
+
+# Refactor collective bargaining variables
+df$COLLBARG <- as.factor(ifelse(df$COLLBARG == 1, "Yes", "No"))
+
+# Refactor urban (2011) variable 
+df$AREA11 <- as.factor(ifelse(df$URBAN == 0, "Rural", ifelse(df$URBAN == 1, "Urban", "Unknown")))
+
+# Drop the urban variable
+df <- subset(df, select = -c(URBAN))
+```
+
+### 4.4 Splitting the Dataset
+
+Since I will be creating models and validating them, I split the dataset 80-20 into a training and testing set.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Set seed
+set.seed(101)
+
+# Obtain 80-20 split
+train.obs <- sample(1:nrow(df), round(nrow(df) * .8), replace = FALSE)
+
+# Split the dataset into a training and testing set
+train <- df[train.obs, ]
+test <- df[-train.obs, ]
+
+# Verify the dimensions of the dataset
+dim(train)
+dim(test)
+```
+
+### 4.5 Exporting the Dataset
+
+Finally, I exported the data into two separate csv files to use in the EDA and modeling sections.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Export data into csv files
+write.csv(train, "data/NLSY97_train.csv")
+write.csv(test, "data/NLSY97_test.csv")
+```
+
+

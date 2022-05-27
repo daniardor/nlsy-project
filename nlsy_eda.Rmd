@@ -1,0 +1,790 @@
+---
+title: "Exploratory Data Analysis"
+output: 
+  rmarkdown::github_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## 1. Introduction
+
+This section will focus on exploring the NLSY dataset of 1997. I will visualize the variables and their relationships to determine whether or not to include them in the model. Specifically, I will be looking for variables that have a linear relationship with the target variable, hourly wage, and transform them if necessary.
+
+I divided the variables into different categories such as demographics, location, etc. for organization purposes.
+
+### 1.1 Loading Packages
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Load required libraries
+library(ggplot2)
+library(GGally)
+library(ggthemes)
+library(RColorBrewer)
+library(stats)
+```
+
+### 1.2 Importing the Data
+
+I will be using the **training set** for exploratory data analysis while the **testing set** will be reserved for model testing.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Import data
+train <- read.csv("data/NLSY97_train.csv")
+```
+
+### 1.3 Verifying the Dataset
+
+I viewed the structure of the training set to double check that the data cleaning done on the previous section was kept. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View structure of the dataset
+str(train)
+```
+
+There are 2 variables, **ID** and **X**, that will not be used for this project.  
+
+### 1.4 Defining Variables
+
+I defined 2 vectors of color hex codes to be used for the visualizations. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Hex codes for factor variables
+colors.f <- c("#334257", "#476072", "#548CA8", "#11324D", "#001E6C", "#035397")
+
+# Hex codes for binary variables
+colors.b <- c("#21ABA5", "#163A5F")
+```
+
+
+## 2. Work-Related Variables
+
+The first set of variables I will be exploring are the work-related variables. It also contains the target variable, **EARNINGS**, which is the hourly wage of the NLSY97 participants. All of these variables are as of the 2011 interview.
+
+**List of Variables**:
+
+1. **HOURS** - usual number of hours worked per week
+2. **TENURE** - years with current employer
+3. **EXP** - total out-of-school work experience (years) 
+4. **JOBS** - number of jobs
+5. **CATEMP** - category of employment
+6. **CATSE** - self-employment
+7. **COLLBARG** - pay set by collective bargaining
+
+### 2.1 Hourly Wage
+
+I looked at the summary statistics of hourly wage and plotted its distribution.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View summary statistics of hourly wage
+summary(train$EARNINGS)
+
+# View standard deviation of hourly wage
+sd(train$EARNINGS)
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Histogram of hourly wage
+ggplot(train, aes(x = EARNINGS)) +
+  geom_histogram(fill = "#163A5F", color = "black") +
+  xlab("Hourly Wage (dollars/hr)") + 
+  ylab("Count") +
+  ggtitle("2011 Hourly Wages") +
+  theme_economist() +
+  theme(axis.text=element_text(size=12), axis.title=element_text(size=12))
+```
+
+The distribution of hourly wage is strongly right-skewed with a **mean hourly wage of \$18.94/hr** and a **median hourly wage of \$15.81/hr**. Since hourly wage is right-skewed, it breaks the normality assumption of the linear regression model. Thus, I transformed hourly wage into *log(hourly wage)* and plotted its distribution.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Histogram of log hourly wage
+ggplot(train, aes(x = log(EARNINGS))) +
+  geom_histogram(fill = "#163A5F", color = "black") +
+  xlab("log(Hourly Wage) [log(dollars)/hr]") + 
+  ylab("Count") +
+  ggtitle("2011 log(Hourly Wages)") +
+  theme_economist() +
+  theme(axis.text=element_text(size=12), axis.title=element_text(size=12))
+```
+
+As shown by the histogram, the distribution of *log(hourly wage)* is approximately normal. Thus, I decided to create a new variable, **logWAGE**, that will serve as the new target variable. Therefore, I will be looking for linear relationships with this new variables as opposed to **EARNINGS**.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Log transform hourly wage and store it as a new variable in the dataframe
+train$logWAGE <- log(train$EARNINGS)
+
+# View summary statistics of log(Wage)
+summary(train$logWAGE)
+
+# View standard deviation of log(Wage)
+sd(train$logWAGE)
+```
+
+The mean and median *log(hourly wage)* are approximately equal (2.76 and 2.78 log($)/hr, respectively).
+
+### 2.2 Weekly Hours, Tenure, Experience, and Number of Jobs
+
+I looked at the continuous work-related variables: **HOURS**, **TENURE**, **EXP**, and **JOBS**.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View summary statistics of work-related variables
+summary(subset(train, select = c(HOURS, TENURE, EXP, JOBS)))
+```
+
+There are 31 missing values in the **JOBS** column. Since the minimum number of jobs is 1, and the minimum hourly wage is $2/hr, it can be implied that every person in the study has had at least 1 job. Thus, these missing values may be filled in with 1 to indicate that they have had 1 job.
+
+Next, I looked at the scatterplot matrix of the continuous work-related variables to see their relationship with **logWAGE**. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Plot a scatterplot matrix of the continuous work-related variables
+ggpairs(train, columns = c("HOURS", "TENURE", "EXP", "JOBS", "logWAGE")) + theme_bw()
+```
+
+**Summary of Findings**:
+
+- There is a weak, positive relationship between **logWAGE** and **HOURS**. The same is true for **TENURE**.
+- There is a very weak, negative relationship between **JOBS** and **logWAGE**.
+- There is a moderate, negative relationship between the **JOBS** and **TENURE**. This is expected since the more jobs an individual has had, the less amount of time they've had to accumulate a longer tenure.
+- There is a weak, positive relationship between **EXP** and **TENURE**. This is also expected since the longer the tenure, the more experience one has had outside of school.
+
+Based on these results, **HOURS** and **TENURE** could be potentially strong predictors for **logWAGE**. However, **JOBS** and **EXP** do not show a linear relationship with **logWAGE** and are correlated with **TENURE**. Thus, I will be excluding them from the model to avoid collinearity.
+
+### 2.3 Category of Employment
+
+I looked at the variables related to employment: **CATEMP** and **CATSE**.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View summary statistics of work-related variables
+summary(subset(train, select = c(CATEMP, CATSE)))
+
+# Prevalence of category of employment
+877 / (1190)
+
+# Prevalence of self-employment
+83 / (1190)
+```
+
+**73.7%** of the participants work in the private sector. Only **7.0%** are self-employed.
+
+Next, I plotted box plots of the variables to compare the distributions of **logWAGE** of the different employment categories.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="75%"}
+# Box plot of employment category against log(Hourly Wage)
+ggplot(train, aes(x = CATEMP, y = logWAGE)) +
+  geom_boxplot(aes(fill = CATEMP)) +
+  xlab("Category of Employment") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Category of Employment") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+```
+
+The majority of participants work in the private sector, which contributes to its large spread. Government workers appear to have the higher median **logWAGE**, but there might be more workers in the private sector who make more money overall.
+
+I decided to recode the **CATEMP** variable into a new variable, **PRIV**. This new variable is binary and will group those who do not work in the private sector (government, non-profit, and missing value) together. This can potentially reduce the number of variabes in the model and addresses the issue of the missing values. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Create a private sector variable
+train$PRIV <- as.factor(ifelse(train$CATEMP == "Private sector", "Yes", "No"))
+
+# Verify the new variable
+summary(subset(train, select = c(PRIV, CATEMP)))
+
+# Box plot of private sector against log(hourly wage)
+ggplot(train, aes(x = PRIV, y = logWAGE)) +
+  geom_boxplot(aes(fill = PRIV)) +
+  xlab("Private Sector") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Private Sector") +
+  scale_fill_manual(values = colors.b) +
+  theme_economist()
+```
+
+The median **logWAGE** of participants who work in the private sector appear to be lower than those who do not. Thus, I think **PRIV** could potentially be a strong predictor in the model.
+
+Next, I looked at the box plot of self-employment.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Box plot of self-employment against log(Hourly Wage)
+ggplot(train, aes(x = CATSE, y = logWAGE)) +
+  geom_boxplot(aes(fill = CATSE)) +
+  xlab("Self-Employment") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Self-Employment") +
+  scale_fill_manual(values = colors.b) +
+  theme_economist()
+```
+
+Other than spread, there does not appear to be a significant difference in the distributions of **logWAGE** for self-employment. Due to this, and because the prevalence of the variable is so low at 7.0%, I will be excluding **CATSE** from the model.
+
+### 2.4 Collective Bargaining
+
+The final work-related variable, **COLLBARG**, indicates whether or not a participant has their pay set by collective bargaining. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View summary statistics of collective bargaining
+summary(train$COLLBARG)
+
+# Calculate prevalence of collective bargaining
+141 / 1190
+```
+
+**11.8%** of participants have their pay set by collective bargaining.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Box plot of collective bargaining against log(Hourly Wage)
+ggplot(train, aes(x = COLLBARG, y = logWAGE)) +
+  geom_boxplot(aes(fill = COLLBARG)) +
+  xlab("Collective Bargaining") + 
+  ylab("Log(Hourly Wage)") +
+  ggtitle("Collective Bargaining") +
+  scale_fill_manual(values = colors.b) +
+  theme_economist()
+```
+
+Overall, those who have their pay set by collective bargaining have a higher hourly wage than those who do not. Thus, I decided to include **COLLBARG** in the model.
+
+
+## 3. Demographics
+
+The next set of variables I will look into are demographics. Other variables related to demographics such as education, household/family, and location will be explored separately for simplification.
+
+**List of Variables**:
+
+1. **SEX** - sex of respondent
+2. **ETHNICITY** - ethnicity of respondent
+3. **AGE** - age in 2011
+4. **BYEAR** - year of birth
+5. **HEIGHT** - height in inches as of 2004
+6. **WEIGHT04** - weight in pounds as of 2004
+7. **WEIGHT011** - weight in pounds as of 2011
+8. **MARITALSTAT** - marital status
+9. **FAITH** - religious faith of respondent
+
+### 3.1 Age, Height, and Weight
+
+I first looked at the variables related to the physical attributes of the respondents to see if these variables are associated with how much they make. I decided to exclude birth year, **BYEAR**, since it can be derived from **AGE**.
+
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View statistical summary of demographic-related variables
+summary(subset(train, select = c(AGE, HEIGHT, WEIGHT04, WEIGHT11)))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Plot scatterplot matrix of continuous, demographic-related variables
+ggpairs(train, columns = c("AGE", "HEIGHT", "WEIGHT04", "WEIGHT11", "logWAGE")) + theme_bw()
+```
+
+**Summary of Findings**:
+
+- Age is a discrete variable with only 5 values: 27, 28, 29, 30, and 31 years.
+- There appears to be no association between **WEIGHT04** and **logWAGE**. The same is true for weight in 2011.
+- There appears to be a very weak, positive association between **HEIGHT** and **logWAGE**.
+
+I decided to plot **AGE** as a factor variable to see each if the distributions of hourly wage differ for each year.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Box plot of Age against log(Hourly Wage)
+ggplot(train, aes(x = factor(AGE), y = logWAGE)) +
+  geom_boxplot(aes(fill = factor(AGE))) +
+  xlab("Age (years)") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Age")  +
+  scale_fill_brewer(palette="GnBu") +
+  theme_economist() + 
+  theme(legend.title = element_blank())
+```
+
+Houely wage is generally the same for each age group, which is expected since the age groups are so close to each other. 
+
+Based on these results, I decided to exclude all of these variables from the model. 
+
+### 3.2 Sex, Ethnicity, Marital Status, and Faith
+
+Next, I examined the remaining demographic variables.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View statistical summary of demographic-related variables
+summary(subset(train, select = c(SEX, ETHNICITY, MARITALSTAT, FAITH)))
+```
+
+The number of male and female participants are almost equal. The majority of participants are non-black and non-Hispanic. The majority of participants are also married with a spouse present. **FAITH** is mostly made up of Catholics and Protestants. 
+
+I plotted the box plots of each variable to see if the distributions of **logWAGE** differ among the different groups.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="50%"}
+# Box plot of Sex against log(Hourly Wage)
+ggplot(train, aes(x = SEX, y = logWAGE)) +
+  geom_boxplot(aes(fill = SEX)) +
+  xlab("Sex") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Sex") +
+  scale_fill_manual(values = colors.b) +
+  theme_economist()
+
+# Box plot of Ethnicity against log(Hourly Wage)
+ggplot(train, aes(x = ETHNICITY, y = logWAGE)) +
+  geom_boxplot(aes(fill = ETHNICITY)) +
+  xlab("Ethnicity") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Ethnicity") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+# Box plot of Faith against log(Hourly Wage)
+ggplot(train, aes(x = FAITH, y = logWAGE)) +
+  geom_boxplot(aes(fill = FAITH)) +
+  xlab("Faith") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Faith") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+# Box plot of Marital Status against log(Hourly Wage)
+ggplot(train, aes(x = MARITALSTAT, y = logWAGE)) +
+  geom_boxplot(aes(fill = MARITALSTAT)) +
+  xlab("Marital Status") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Marital Status")+
+  scale_fill_manual(values = colors.f) +
+  theme_economist()+
+  theme(legend.title = element_blank(), legend.text = element_text(size=10))
+
+```
+
+**Summary of Findings**:
+
+- Men tend to have a higher hourly wage than women. 
+- Non-blacks/non-Hispanics and Hispanics tend to have a higher hourly wage than black people.
+- Jewish participants have the highest median **logWAGE** while the median **logWAGE** for Catholics, Protestants, None, and Other are about the same.
+- Participants who are married (with spouse present) make more money than those who are cohabiting or single.
+
+Based on these results, I decided to include **SEX**, **ETHNICITY**, and **MARITALSTAT** in the model. The distributions of hourly wage are generally the same for the different faiths except for Jewish, but recoding **FAITH** to Jewish/Not Jewish will not be useful due to the low prevalence. Thus, this variable will be excluded from the model.
+
+I decided to recode marital status into a new binary variable, **MARRIED**, which will group those who are cohabiting and single together. Unlike faith, the prevalence of married participants is high enough to become a useful predictor.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Create a the married variable
+train$MARRIED <- as.factor(ifelse(train$MARITALSTAT == "Married, spouse present", "Yes", "No"))
+
+# Verify the new variable
+summary(subset(train, select = c(MARRIED, MARITALSTAT)))
+
+# Box plot of marriage status against log(hourly wage)
+ggplot(train, aes(x = MARRIED, y = logWAGE)) +
+  geom_boxplot(aes(fill = MARRIED)) +
+  xlab("Married with Spouse Present") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Marital Status") +
+  scale_fill_manual(values = colors.b) +
+  theme_economist()
+```
+
+As expected, participants who are married with a spouse present tend to have a higher **logWAGE**.
+
+
+## 4. Education
+
+The next set of variables I will explore are the variables related to education.
+
+**List of Variables**:
+
+1. **S** - years of schooling as of 2011
+2. **EDUCATION** - highest educational qualification
+3. **ASVABAR** - arithmetic reasoning score
+4. **ASVABWK** - word knowledge score
+5. **ASVABPC** - paragraph comprehension score
+6. **ASVABNO** - numerical operations score
+7. **ASVABMK** - math knowledge score
+8. **ASVABCS** - coding speed score
+9. **ASVABC** - composite of ASVABAR, ASVABWK, and ASVABPC
+10. **ASVABC4** - composite of ASVABAR, ASVABWK, ASVABPC and ASVABMK score
+11. **VERBAL** - composite of ASVABWK and ASVABPC
+12. **ASVABMV** - NLSY constructed math verbal composite
+
+### 4.1 Schooling & Highest Educational Qualification
+
+I first looked at the relationship between the years of schooling and the highest educational qualification.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View statistical summary of education-related variables except for ASVAB test scores
+# Box plot of Sex against log(Hourly Wage)
+ggplot(train, aes(x = reorder(EDUCATION, S), y = S)) +
+  geom_boxplot(aes(fill = EDUCATION)) +
+  xlab("Highest Education Qualification") + 
+  ylab("Years of Schooling") +
+  ggtitle("Years of Schooling vs. Highest Education Qualification") +
+  scale_fill_brewer(palette="GnBu") +
+  theme_economist() +
+  theme(axis.title.x=element_blank(), 
+        axis.text.x = element_text(angle = 15, vjust = 1),
+        axis.line= element_blank(),
+        axis.ticks = element_blank(),
+        legend.key.size = unit(.3, 'cm'), 
+        legend.title = element_blank())
+```
+
+As shown by the box plot, these variables are highly correlated. Thus, I will only be including 1 of them in the model.
+
+I proceeded to look at their relationships with **logWAGE**.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View statistical summary of education-related variables except for ASVAB test scores
+summary(subset(train, select = c(S, EDUCATION)))
+```
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Box plot of highest educational qualification against log(Hourly Wage)
+ggplot(train, aes(x = reorder(EDUCATION, logWAGE), y = logWAGE)) +
+  geom_boxplot(aes(fill = EDUCATION)) +
+  xlab("Education Completed") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Highest Educational Qualification") +
+  scale_fill_brewer(palette="GnBu") +
+  theme_economist() +
+  theme(axis.title.x=element_blank(), 
+        axis.text.x = element_text(angle = 15, vjust = 1),
+        axis.line= element_blank(),
+        axis.ticks = element_blank(),
+        legend.key.size = unit(.3, 'cm'), 
+        legend.title = element_blank())
+```
+
+As expected, **logWAGE** increases as the highest educational qualification increases.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Scatterplot of Years of Schooling vs. log(Hourly Wage)
+ggplot(train, aes(x = S, y = logWAGE)) +
+  geom_point() +
+  xlab("Years of Schooling") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("log(Hourly Wage) vs. Schooling") +
+  scale_color_brewer(palette="GnBu") +
+  geom_smooth(method='lm') +
+  theme_economist()
+```
+
+The same is true for the years of schooling.
+
+Years of schooling and highest educational qualification are esentially the same variable. I decided to include years of schooling, **S**, in the model because it is a continuous variable that can encompass more values.
+
+### 4.2 ASVAB Test Scores
+
+The **Armed Services Vocational Aptitude Battery**, or **ASVAB**, is a test developed by the Department of Defense. The dataset includes scores of each individual test sections as well as composite scores. I first looked at the individual test scores for arithmetic reasoning, word knowledge, paragraph comprehension, numerical operations, coding speed, and math knowledge.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain numerical summary of individual ASVAB test scores
+summary(subset(train, select = c(ASVABAR, ASVABWK, ASVABPC, ASVABNO, ASVABCS, ASVABMK)))
+
+# Plot scatterplot matrix of individual ASVAB test scores
+ggpairs(train, columns = c("ASVABAR", "ASVABWK", "ASVABPC", "ASVABNO", "ASVABCS", "ASVABMK", "logWAGE")) + theme_bw()
+```
+
+There is a positive but weak association between all the test scores and **logWAGE**. This is expected since a high score usually indicates aptitude, which higher-paying jobs usually require.
+
+Next, I looked at the composite scores, one of which was constructed by the NLSY.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# Obtain numerical summary of composite ASVAB test scores
+summary(subset(train, select = c(ASVABC, ASVABC4, VERBAL, ASVABMV)))
+
+# PLot scatterplot matrix of composite ASVAB test scores
+ggpairs(train, columns = c("ASVABC", "ASVABC4", "VERBAL", "ASVABMV", "logWAGE")) + theme_bw()
+```
+
+The composite scores are highly correlated with each other as they are essentially different variations of the same thing. As with the individual scores, the composite scores also have a weak, positive association with **logWAGE**.
+
+I decided to include the composite score constructed by the NLSY, **ASVABC4**, in the model since it has the strongest association with **logWAGE**. The remaining variables, composite or individual, will be excluded due to multicollinearity.
+
+## 5. Household-Related Variables
+
+The next set of variables I will explore are the **household-related** variables.
+
+**List of Variables**:
+
+1. **SM** - years of schooling of biological mother
+2. **SF** - years of schooling of biological father
+3. **SMR** - years of schooling of residential mother
+4. **SFR** - years of schooling of residential father
+5. **SIBLINGS** - number of siblings
+6. **AGEMBTH** - age of mother at respondent's birth
+7. **HHINC97** - gross household income in $ in 1996
+8. **POVRAT97** - ratio of household income to poverty level in 1997
+9. **HOUSE97** - household structure in 1997
+10. **MATSTYLE** - parenting style of the mother
+11. **PATSTYLE** - parenting style of the father
+12. **PRMONM** - monitoring by mother
+13. **PRMONF** - monitoring by father
+
+
+### 5.1 Family Background
+
+I first examined the family background variables. This includes years of schooling of the parents, number of siblings, and the age of the participants' birth mother.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View statistical summary of family background-related variables 
+summary(subset(train, select = c(SM, SF, SMR, SFR, SIBLINGS, AGEMBTH)))
+
+# PLot scatterplot matrix of family background-related variables
+ggpairs(train, columns = c("SM", "SF", "SMR", "SFR", "SIBLINGS", "AGEMBTH", "logWAGE")) + theme_bw()
+```
+
+**Summary of Findings**:
+
+- There are missing values for **SMR**, **SFR**, and **AGEMBTH**.
+- **logWAGE** appears to have a very weak, positive relationship with the years of schooling of the participants' parent, whether they are biological or residential.
+- There is a very weak, negative relationship with the number of siblings and **logWAGE**.
+- There is no association between the participant's mother's age and their hourly wage.
+
+Since the associations are very weak, I decided to exclude all of these variables in the model.
+
+### 5.2 Household Income and Poverty Rate in 1997
+
+Next, I looked at the household income and poverty rate variables.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View statistical summary of household income and poverty rate 
+summary(subset(train, select = c(HHINC97, POVRAT97)))
+
+# PLot scatterplot matrix of household income and poverty rate with log(Wage)
+ggpairs(train, columns = c("HHINC97", "POVRAT97", "logWAGE")) + theme_bw()
+```
+
+Both household income and poverty rate have a large amount of missing values in the dataset. Both variables also have a weak, positive relationship with **logWAGE**. However, they have an extremely strong, positive relationship with each other (*r = 0.96*).
+
+Since these two variables are highly correlated, I can only select one to include in the model. I decided to include household income, **HHINC97**, since it has a slightly higher correlation coefficient with **logWAGE**.
+
+Due to the large magnitude of household income, I decided to perform a log transformation on the variable.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Scatterplot of Years of Schooling vs. log(Hourly Wage)
+ggplot(train, aes(x = log(HHINC97 + 1), y = logWAGE)) +
+  geom_point() +
+  xlab("log(Household Income in 1996) (log dollars)") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("log(Hourly Wage) vs. log(Household Income)") +
+  geom_smooth(method='lm') +
+  theme_economist()
+```
+
+There appears to be a stronger linear relationship between the log transformed variable and hourly wage than the regular variable.
+
+### 5.3 Household Parental Structure in 1997
+
+Next, I looked at the variables related to household structure, parental style, and parental monitoring in 1997.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View statistical summary of household parental structure variables 
+summary(subset(train, select = c(HOUSE97, MATSTYLE, PATSTYLE, PRMONM, PRMONF)))
+```
+
+There are many missing values for parental style and parental monitoring.
+
+I plotted a scatterplot matrix of the parental monitoring variables to see their relationship with **logWAGE**.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# PLot scatterplot matrix of household parental structure variables 
+ggpairs(train, columns = c("PRMONM", "PRMONF", "logWAGE")) + theme_bw()
+```
+
+There does not appear to be an association between **logWAGE** and parental monitoring for either mother or father. Thus, they will be excluded from the model. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="50%"}
+# Box plot of materal parenting style against log(hourly wage)
+ggplot(train, aes(x = MATSTYLE, y = logWAGE)) +
+  geom_boxplot(aes(fill = MATSTYLE)) +
+  xlab("Maternal Parenting Style") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Maternal Parenting Style") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+# Box plot of paternal parenting style against log(hourly wage)
+ggplot(train, aes(x = PATSTYLE, y = logWAGE)) +
+  geom_boxplot(aes(fill = PATSTYLE)) +
+  xlab("Paternal Parenting Style") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Paternal Parenting Style") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+# Box plot of household structure against log(hourly wage)
+ggplot(train, aes(x = HOUSE97, y = logWAGE)) +
+  geom_boxplot(aes(fill = HOUSE97)) +
+  xlab("Household Structure") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Household Structure")+
+  scale_fill_manual(values = colors.f) +
+  theme_economist() + 
+  theme(axis.text.x = element_text(angle = 10, vjust = 1),
+        legend.text = element_text(size=10),
+        legend.title = element_blank())
+```
+
+The distributions of **logWAGE** are generally the same for all household structures except for participants living with both of their biological parents.They are also generally the same for all parental styles for either mother and father.
+
+Based on these results, it looks like household structure, **HOUSE97**, could be a potential predictor for the model. I decided to recode it into a new binary variable, **BIOPARENTS**, by combining participants who do not have their biological mother and father in their household.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="65%"}
+# Create biological parent variable
+train$BIOPARENTS <- as.factor(ifelse(train$HOUSE97 == "Biological mother and father",
+                                     "Yes", "No"))
+
+# Verify the new variables
+summary(subset(train, select = c(BIOPARENTS, HOUSE97)))
+
+# Box plot of biological parents against log(hourly wage)
+ggplot(train, aes(x = BIOPARENTS, y = logWAGE)) +
+  geom_boxplot(aes(fill = BIOPARENTS)) +
+  xlab("Biological Mother and Father") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Biological Mother and Father in Household") +
+  scale_fill_manual(values = colors.b) +
+  theme_economist()
+```
+
+The median **logWAGE** is higher for participants with their biological mother and father in 1997. Thus, I decided to include this new variable, **BIOPARENTS**, in the model. 
+
+## 6. Location
+
+The final set of variables I will be looking into are the location-related variables. 
+
+**List of Variables**:
+
+1. **METSTAT97** - living in a metorpolitan statistical area in 1997
+2. **METSTAT11** - living in a metropolitan statistical area in 2011
+3. **CENREG97** - census region in 1997
+4. **CENREG11** - census region in 2011
+5. **AREA97** - living in an urban or rural area in 1997
+6. **AREA11** - living in an urban or rural area in 2011
+
+### 6.1 Metropolitan Statistical Area
+
+First, I looked at the Metropolitan Statistical Area variables.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View summary statistics of Metropolitan Statistical Area
+summary(subset(train, select = c(METSTAT97, METSTAT11)))
+```
+
+Compared to 1997, more participants live in the Metropolitan Statistical Area in 2011, specifically in the central city.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="50%"}
+# Box plot of Metropolitan Statistical Area in 1997 against log(Hourly Wage)
+ggplot(train, aes(x = METSTAT97, y = logWAGE)) +
+  geom_boxplot(aes(fill = METSTAT97)) +
+  xlab("Metropolitan Statistical Area") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Metropolitan Statistical Area in 1997")+
+  scale_fill_manual(values = colors.f) +
+  theme_economist() +
+  theme(legend.title = element_blank())
+
+# Box plot of Metropolitan Statistical Area in 2011 against log(Hourly Wage)
+ggplot(train, aes(x = METSTAT11, y = logWAGE)) +
+  geom_boxplot(aes(fill = METSTAT11)) +
+  xlab("Metropolitan Statistical Area") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Metropolitan Statistical Area in 2011") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist() +
+  theme(legend.title = element_blank())
+```
+
+In 1997, those who lived outside the Metropolitan Statistical Area had the lowest median **logWAGE** while those who lived outside the central city had the highest median **logWAGE**. In 2011, the median **logWAGE** increased for those who live in the central city and those who don't live in a Metropolitan Statistical Area. It decreased for those who live in the central city.
+
+For both years, the differences among the distributions are very small. Thus, I decided to exclude these variables from the model.
+
+### 6.2 Census Region
+
+Next, I looked at the census region variables.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View summary statisics of census region
+summary(subset(train, select = c(CENREG97, CENREG11)))
+```
+
+The number of people living in the West increased from 1997 to 2011, while the number of people living in the South decreased. Those who lived in the North central and North east regions generally stayed the same. 
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="50%"}
+# Box plot of census region in 1997 against log(hourly wage)
+ggplot(train, aes(x = CENREG97, y = logWAGE)) +
+  geom_boxplot(aes(fill = CENREG97)) +
+  xlab("Census Region") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Census Region in 1997")+
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+# Box plot of census region in 2011 against log(hourly wage)
+ggplot(train, aes(x = CENREG11, y = logWAGE)) +
+  geom_boxplot(aes(fill = CENREG11)) +
+  xlab("Census Region") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Census Region in 2011") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+```
+
+Those who lived in the North East and West in 1997 tend to make more money than those who lived in the North central and South regions.
+
+As for 2011, the median **logWAGE** for those who live in the South increased while the median **logWAGE** for those who live in the West decreased. This may be due to the migration of people from the South to the West.
+
+For both years, the differences among the distributions are very small. Thus, I decided to exclude these variables from the model.
+
+### 6.3 Urban/Rural Area
+
+Finally, I looked at the urbal/rural variables.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE}
+# View summary statistics of rural/urban areas
+summary(subset(train, select = c(AREA97, AREA11)))
+```
+
+The number of people who live in rural and urban areas generally stayed the same between 1997 and 2011.
+
+```{r echo = TRUE, warning = FALSE, message=FALSE, fig.show="hold", out.width="50%"}
+# Box plot of urban/rural area in 1997 against log(hourly wage)
+ggplot(train, aes(x = AREA97, y = logWAGE)) +
+  geom_boxplot(aes(fill = AREA97)) +
+  xlab("Area") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Urban/Rural Area")+
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+# Box plot of urban/rural area in 2011 against log(hourly wage)
+ggplot(train, aes(x = AREA11, y = logWAGE)) +
+  geom_boxplot(aes(fill = AREA11)) +
+  xlab("Area") + 
+  ylab("log(Hourly Wage)") +
+  ggtitle("Urban/Rural Area") +
+  scale_fill_manual(values = colors.f) +
+  theme_economist()
+
+```
+
+For both years, the distributions of **logWAGE** are the same for both participants who live in rural areas and those who live in urban areas. Thus, I will not be including these variables in the model. 
+
+## 7. Conclusion
+
+This section focused on exploring and analyzing the data to determine which variables will be suitable for the predictive model. Specifically, I focused on linear relationships between the variables and hourly wage. I ended up transforming some of the variables, including hourly wage, to meet the assumptions of a linear regression model and recoded some qualitative variables for simplification. I also excluded variables that are associated with each other to avoid issues with multicollinearity.
+
+Based on these results, the following variables will be included in the model:
+
+1. **HOURS** - usual number of hours worked per week
+2. **TENURE** - years with current employer
+3. **PRIV** - works in the private sector
+4. **COLLBARG** - pay set by collective bargaining
+5. **SEX** - sex of the respondent
+6. **ETHNICITY** - ethnicity of the respondent
+7. **MARRIED** - whether or not the respondent is married with spouse present
+8. **S** - years of schooling
+9. **ASVABC4** - composite score on the ASVAB test
+10. **logHHINC97** - household income in 1996, log transformed
+11. **BIOPARENTS** - whether or not both biological parents were present in 1997
